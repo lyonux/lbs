@@ -24,3 +24,12 @@ target
 *.swo
 *~
 *-local
+.zed
+.vscode/
+.claude/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
