@@ -1,24 +1,68 @@
 use crate::config::{Protocol, Rule};
 use crate::network::Interface;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
+use futures::stream::{StreamExt, TryStreamExt};
+use netlink_packet_core::{
+    NLM_F_ACK, NLM_F_CREATE, NLM_F_EXCL, NLM_F_REQUEST, NetlinkMessage, NetlinkPayload,
+};
+use netlink_packet_route::RouteNetlinkMessage;
+use netlink_packet_route::tc::{
+    TcAction, TcActionAttribute, TcActionGeneric, TcActionNatOption, TcActionOption, TcActionType,
+    TcAttribute, TcFilterU32, TcFilterU32Option, TcHandle, TcMessage, TcNat, TcOption, TcU32Key,
+    TcU32Selector,
+};
+
+use rtnetlink::{Handle, new_connection};
 use std::collections::HashSet;
 use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 
+const TCA_ACT_TAB: u16 = 1;
+const TCA_ACT_PEDIT: &str = "pedit";
+const TCA_PEDIT_PARMS: u16 = 1;
+const TCA_ACT_CSUM: &str = "csum";
+const TCA_CSUM_PARMS: u16 = 1;
+
+const TCA_CSUM_F_FLAG_IPV4HDR: u32 = 1 << 0;
+const TCA_CSUM_F_FLAG_TCP: u32 = 1 << 1;
+const TCA_CSUM_F_FLAG_UDP: u32 = 1 << 2;
+
+const ETH_P_IP: u16 = 0x0800;
+const ETH_P_ALL: u16 = 0x0003;
+
+const U32_HT_ID: u16 = 0x800; // Hash table ID
+const U32_FILTER_HANDLE: u16 = 0x800; // Filter entry handle
+const TC_FILTER_PRIORITY: u32 = 49152; // 0xc000
+
+/// Convert protocol to network byte order for tcm_info field.
+/// The kernel expects protocol in network byte order (htons).
+fn protocol_to_tc_info(protocol: u16) -> u16 {
+    protocol.to_be()
+}
+
 /// Traffic Control (tc) rule manager
 pub struct TcManager {
     interface: Interface,
+    handle: Handle,
     current_rules: HashSet<Rule>,
     qdisc_initialized: bool,
 }
 
 impl TcManager {
-    pub fn new(interface: Interface) -> Self {
-        Self {
+    pub fn new(interface: Interface) -> Result<Self> {
+        let (connection, handle, _) =
+            new_connection().context("Failed to create rtnetlink connection")?;
+
+        tokio::spawn(connection);
+        Ok(Self {
             interface,
+            handle,
             current_rules: HashSet::new(),
             qdisc_initialized: false,
-        }
+        })
+    }
+    pub fn interface_index(&self) -> i32 {
+        self.interface.index as i32
     }
 
     /// Initialize the HTB qdisc on the interface
@@ -33,45 +77,87 @@ impl TcManager {
         );
 
         // Check if qdisc already exists
-        let check_output = Command::new("tc")
-            .args(["qdisc", "show", "dev", &self.interface.name])
-            .output()
-            .await
-            .context("Failed to execute tc qdisc show command")?;
+        let mut qdiscs = self
+            .handle
+            .qdisc()
+            .get()
+            .index(self.interface_index())
+            .execute();
 
-        let stdout = String::from_utf8_lossy(&check_output.stdout);
-        if stdout.contains("qdisc htb 1:") {
-            debug!("HTB qdisc already exists on {}", self.interface.name);
+        let mut qdisc_exists = false;
+        while let Some(qdisc) = qdiscs
+            .try_next()
+            .await
+            .map_err(|e| anyhow!("Failed to query qdisc: {}", e))?
+        {
+            if qdisc.header.index == self.interface_index() {
+                if let TcAttribute::Kind(kind) = &qdisc.attributes[0] {
+                    if kind == "htb" && qdisc.header.handle.major == 1 {
+                        debug!("HTB qdisc already exists on {}", self.interface.name);
+                        qdisc_exists = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if qdisc_exists {
             self.qdisc_initialized = true;
             return Ok(());
         }
 
-        // Add HTB qdisc
-        let output = Command::new("tc")
-            .args([
-                "qdisc",
-                "add",
-                "dev",
-                &self.interface.name,
-                "root",
-                "handle",
-                "1:",
-                "htb",
-            ])
-            .output()
-            .await
-            .context("Failed to execute tc qdisc add command")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("Failed to add HTB qdisc: {}", stderr);
-        }
+        self.add_htb_qdisc().await?;
 
         self.qdisc_initialized = true;
         info!(
             "Successfully initialized HTB qdisc on {}",
             self.interface.name
         );
+        Ok(())
+    }
+    async fn add_htb_qdisc(&mut self) -> Result<()> {
+        let mut msg = TcMessage::with_index(self.interface_index());
+        msg.header.parent = TcHandle::ROOT;
+        msg.header.handle = TcHandle { major: 1, minor: 0 };
+        msg.header.info = ((1u32) << 16) | (protocol_to_tc_info(ETH_P_ALL) as u32);
+
+        msg.attributes.push(TcAttribute::Kind("htb".to_string()));
+
+        // Build tc_htb_glob structure for TCA_HTB_INIT
+        let mut init_data = vec![0u8; 20];
+        init_data[0..4].copy_from_slice(&3u32.to_ne_bytes());
+        init_data[4..8].copy_from_slice(&10u32.to_ne_bytes());
+        init_data[8..12].copy_from_slice(&1u32.to_ne_bytes());
+
+        msg.attributes
+            .push(TcAttribute::Options(vec![TcOption::Other(
+                netlink_packet_core::DefaultNla::new(
+                    2, // TCA_HTB_INIT
+                    init_data,
+                ),
+            )]));
+
+        let payload = RouteNetlinkMessage::NewQueueDiscipline(msg);
+        let mut req = NetlinkMessage::new(
+            netlink_packet_core::NetlinkHeader::default(),
+            NetlinkPayload::from(payload),
+        );
+        req.header.flags = NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE | NLM_F_EXCL;
+
+        let mut response = self
+            .handle
+            .request(req)
+            .context("Failed to send qdisc add request")?;
+
+        while let Some(msg) = response.next().await {
+            if let NetlinkPayload::Error(error) = msg.payload {
+                // error.code is Option<NonZeroI32>, -EEXIST is -17
+                if !matches!(error.code, Some(c) if c.get() == -17) {
+                    anyhow::bail!("Failed to add HTB qdisc: {}", error);
+                }
+            }
+        }
+
         Ok(())
     }
 

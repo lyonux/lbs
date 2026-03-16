@@ -43,7 +43,7 @@ impl RuleManager {
 
         // Create managers
         let mut iptables = IptablesManager::new(interface.clone());
-        let mut tc = TcManager::new(interface);
+        let mut tc = TcManager::new(interface)?;
 
         // Initialize managers
         iptables.initialize().await?;
