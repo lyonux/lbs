@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 use crate::config::Config;
 use crate::iptables::IptablesManager;
 use crate::network::detect_primary_interface;
-use crate::tc::TcManager;
+use crate::traffic_control::TcManager;
 use crate::watcher::ConfigWatcher;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -249,21 +249,6 @@ impl RuleManager {
                     }
                 }
             }
-        }
-
-        Ok(())
-    }
-
-    /// Cleanup all rules
-    async fn cleanup(&mut self) -> Result<()> {
-        info!("Cleaning up all rules");
-
-        if let Err(e) = self.iptables.cleanup().await {
-            warn!("Failed to cleanup iptables rules: {}", e);
-        }
-
-        if let Err(e) = self.tc.cleanup().await {
-            warn!("Failed to cleanup tc rules: {}", e);
         }
 
         Ok(())

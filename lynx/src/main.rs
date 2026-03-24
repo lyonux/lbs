@@ -2,7 +2,7 @@ mod config;
 mod iptables;
 mod manager;
 mod network;
-mod tc;
+mod traffic_control;
 mod watcher;
 
 use anyhow::Result;
