@@ -1,8 +1,6 @@
 use crate::prelude::Action;
-use anyhow::Result;
-use std::future::Future;
+use lyo::prelude::Consumer;
+use lyo::prelude::Producer;
 
-pub trait Worker {
-    fn consume(&self, action: &Action) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
-    fn stop(&self) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
-}
+pub trait Maker: Producer<Action> {}
+pub trait Worker: Consumer<Action> {}
