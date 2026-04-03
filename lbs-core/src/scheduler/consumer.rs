@@ -13,10 +13,10 @@ impl<T: Worker> Consumer<T> {
 }
 
 impl<T: Worker + Sync> ConsumerTrait<Action> for Consumer<T> {
-    async fn consume(&self, action: &Action) {
+    async fn consume(&mut self, action: &Action) {
         self.worker.consume(action).await;
     }
-    async fn stop(&self) {
+    async fn stop(&mut self) {
         self.worker.stop().await;
     }
 }
