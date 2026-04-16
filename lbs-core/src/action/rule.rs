@@ -112,6 +112,7 @@ impl std::fmt::Display for Rule {
 pub enum Protocol {
     Tcp,
     Udp,
+    Any,
 }
 
 impl std::fmt::Display for Protocol {
@@ -119,6 +120,7 @@ impl std::fmt::Display for Protocol {
         match self {
             Protocol::Tcp => write!(f, "TCP"),
             Protocol::Udp => write!(f, "UDP"),
+            Protocol::Any => write!(f, "ANY"),
         }
     }
 }
