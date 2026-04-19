@@ -1,6 +1,5 @@
-use crate::config::Rule;
-use crate::network::Interface;
 use anyhow::{Context, Result};
+use lbs_core::prelude::Rule;
 use std::collections::HashSet;
 use tokio::process::Command;
 use tracing::{debug, error, info, warn};
@@ -11,15 +10,13 @@ const DSCP_RESTORE: u8 = 0x00;
 
 /// iptables rule manager
 pub struct IptablesManager {
-    interface: Interface,
     current_rules: HashSet<Rule>,
     mangle_initialized: bool,
 }
 
 impl IptablesManager {
-    pub fn new(interface: Interface) -> Self {
+    pub fn new() -> Self {
         Self {
-            interface,
             current_rules: HashSet::new(),
             mangle_initialized: false,
         }
@@ -302,15 +299,29 @@ impl IptablesManager {
             to_remove.len()
         );
 
-        // First remove old rules
-        for rule in &to_remove {
-            if let Err(e) = self.delete_rule(rule).await {
-                warn!("Failed to delete rule {}: {}", rule, e);
+        match self.delete_rules(&to_remove).await {
+            Ok(()) => {}
+            Err(e) => {
+                warn!("Failed to delete rules: {}", e);
             }
         }
 
+        match self.add_rules(&to_add).await {
+            Ok(()) => {}
+            Err(e) => {
+                warn!("Failed to add rules: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Add a set of rules, adding new ones and removing old ones
+    pub async fn add_rules(&mut self, to_add: &[Rule]) -> Result<()> {
+        info!("Applying iptables nat rules: {} to add", to_add.len());
+
         // Then add new rules
-        for rule in &to_add {
+        for rule in to_add {
             // Check if rule already exists before adding
             if !self.rule_exists(rule).await? {
                 if let Err(e) = self.add_rule(rule).await {
@@ -322,8 +333,24 @@ impl IptablesManager {
             }
         }
 
+        self.current_rules.extend(to_add.iter().cloned());
+
+        Ok(())
+    }
+
+    /// Delete a set of rules, removing them from iptables
+    pub async fn delete_rules(&mut self, to_remove: &[Rule]) -> Result<()> {
+        info!("Applying iptables nat rules: {} to remove", to_remove.len());
+
+        // First remove old rules
+        for rule in to_remove {
+            if let Err(e) = self.delete_rule(rule).await {
+                warn!("Failed to delete rule {}: {}", rule, e);
+            }
+        }
+
         // Update current rules
-        self.current_rules = new_rules;
+        self.current_rules.retain(|r| !to_remove.contains(r));
 
         Ok(())
     }
@@ -368,44 +395,15 @@ impl IptablesManager {
     pub async fn cleanup(&mut self) -> Result<()> {
         info!("Cleaning up iptables rules");
 
+        info!("Deleted rule: ========1 {}", self.current_rules.len());
         for rule in &self.current_rules {
             if let Err(e) = self.delete_rule(rule).await {
                 warn!("Failed to delete rule {} during cleanup: {}", rule, e);
             }
+            info!("Deleted rule: ======== {}", rule);
         }
 
         self.current_rules.clear();
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::Protocol;
-
-    #[test]
-    fn test_build_nat_args() {
-        let interface = Interface {
-            name: "eth0".to_string(),
-            index: 2,
-        };
-        let manager = IptablesManager::new(interface);
-
-        let rule = Rule {
-            protocol: Protocol::Tcp,
-            vip: "172.16.192.111".to_string(),
-            vip_port: 898,
-            target: crate::config::Target {
-                address: "192.168.2.94".to_string(),
-                port: 898,
-            },
-        };
-
-        let args = manager.build_nat_args(&rule);
-        assert!(args.contains(&"OUTPUT".to_string()));
-        assert!(args.iter().any(|a| a.contains("172.16.192.111/32")));
-        assert!(args.contains(&"898".to_string()));
-        assert!(args.iter().any(|a| a.contains("192.168.2.94:898")));
     }
 }

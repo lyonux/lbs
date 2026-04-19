@@ -1,12 +1,7 @@
-mod config;
-mod iptables;
-mod manager;
-mod network;
-mod traffic_control;
-mod watcher;
-
 use anyhow::Result;
 use clap::Parser;
+use lynx::config::maker::Manager;
+use lynx::prelude::reconcile::ReconcileManager;
 use std::path::PathBuf;
 use tracing::{Level, info};
 use tracing_subscriber::EnvFilter;
@@ -38,11 +33,13 @@ async fn main() -> Result<()> {
     info!("Starting Lynx network rule processor");
     info!("Loading configuration from: {}", args.config.display());
 
-    // Create and run the manager
-    let manager = manager::RuleManager::new(args.config).await?;
+    let (mut manager, maker) = Manager::new(args.config);
+    let reconcile = ReconcileManager::new()?;
 
-    // Run the manager (this will block until shutdown)
-    manager.run().await?;
+    let mut ctl = lbs_core::prelude::Controller::new(reconcile, maker);
+
+    let _ = tokio::spawn(async move { manager.run().await });
+    let _ = tokio::spawn(async move { ctl.run().await }).await;
 
     Ok(())
 }

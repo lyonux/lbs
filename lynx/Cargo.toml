@@ -22,6 +22,8 @@ futures = "0.3.32"
 netlink-packet-route = "0.28"
 netlink-packet-core = "0.8.1"
 netlink-packet-utils = "0.6.0"
+lbs-core = { version = "0.1", path = "../lbs-core" }
+lyo = "0.1"
 
 [profile.release]
 opt-level = 3
