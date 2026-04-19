@@ -395,12 +395,10 @@ impl IptablesManager {
     pub async fn cleanup(&mut self) -> Result<()> {
         info!("Cleaning up iptables rules");
 
-        info!("Deleted rule: ========1 {}", self.current_rules.len());
         for rule in &self.current_rules {
             if let Err(e) = self.delete_rule(rule).await {
                 warn!("Failed to delete rule {} during cleanup: {}", rule, e);
             }
-            info!("Deleted rule: ======== {}", rule);
         }
 
         self.current_rules.clear();

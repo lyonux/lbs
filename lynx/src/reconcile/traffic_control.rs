@@ -540,20 +540,79 @@ impl TcManager {
         Ok(actions)
     }
 
+    #[inline]
+    fn as_any(rule: &Rule) -> Rule {
+        let mut r = rule.clone();
+        r.protocol = Protocol::Any;
+        r
+    }
+
     /// Add tc filter rules using netlink
     pub async fn add_rules(&mut self, to_add: &[Rule]) -> Result<()> {
         let all_list = self.list_filters().await?;
-        for rule in to_add {
-            match all_list.get_filter(rule)? {
-                Some(_) => continue,
-                None => {
-                    if let Err(e) = self.add_rule(rule).await {
+        let current_any = self
+            .current_rules
+            .iter()
+            .map(Self::as_any)
+            .collect::<HashSet<Rule>>();
+
+        let to_add_rules = to_add
+            .iter()
+            .map(&Self::as_any)
+            .collect::<HashSet<Rule>>()
+            .difference(&current_any)
+            .cloned()
+            .collect::<Vec<Rule>>();
+
+        for rule in to_add_rules {
+            match all_list.get_filter(&rule) {
+                Ok(Some(_)) => {}
+                Ok(None) => {
+                    if let Err(e) = self.add_rule(&rule).await {
                         error!("Failed to add tc rule {}: {}", rule, e);
                     }
+                }
+                Err(e) => {
+                    error!("Failed to query tc filter for rule {}: {}", rule, e);
                 }
             }
         }
         self.current_rules.extend(to_add.iter().cloned());
+        Ok(())
+    }
+
+    /// Delete a tc filter rule using netlink
+    pub async fn delete_rules(&mut self, rules: &[Rule]) -> Result<()> {
+        let all_list = self.list_filters().await?;
+
+        // Collect rules to delete
+        let delete_rules_raw: HashSet<&Rule> = rules.iter().collect();
+        // Remove any rules that are still present, leaving only those that need to be deleted
+        self.current_rules.retain(|r| !delete_rules_raw.contains(r));
+
+        let remaining_any: HashSet<Rule> = self.current_rules.iter().map(Self::as_any).collect();
+
+        let to_delete_any = delete_rules_raw
+            .iter()
+            .map(|r| Self::as_any(r))
+            .filter(|r| !remaining_any.contains(r))
+            .collect::<Vec<Rule>>();
+
+        // Delete any rules that are no longer present
+        for rule in &to_delete_any {
+            match all_list.get_filter(rule) {
+                Ok(Some(_)) => {
+                    if let Err(e) = self.delete_rule(rule).await {
+                        error!("Failed to delete tc rule {}: {}", rule, e);
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!("Failed to get tc filter for rule {}: {}", rule, e);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -611,47 +670,6 @@ impl TcManager {
             .map_err(|e| anyhow!("Failed to add tc filter: {}", e))?;
 
         debug!("Successfully added tc rule: {}", rule);
-        Ok(())
-    }
-
-    /// Delete a tc filter rule using netlink
-    pub async fn delete_rules(&mut self, rules: &[Rule]) -> Result<()> {
-        let all_list = self.list_filters().await?;
-
-        let as_any = |r: &Rule| {
-            let mut r = r.clone();
-            r.protocol = Protocol::Any;
-            r
-        };
-
-        // Collect rules to delete
-        let delete_rules_raw: HashSet<&Rule> = rules.iter().collect();
-        // Remove any rules that are still present, leaving only those that need to be deleted
-        self.current_rules.retain(|r| !delete_rules_raw.contains(r));
-
-        let remaining_any: HashSet<Rule> = self.current_rules.iter().map(as_any).collect();
-
-        let to_delete_any = delete_rules_raw
-            .iter()
-            .map(|r| as_any(r))
-            .filter(|r| !remaining_any.contains(r))
-            .collect::<HashSet<Rule>>();
-
-        // Delete any rules that are no longer present
-        for rule in &to_delete_any {
-            match all_list.get_filter(rule) {
-                Ok(Some(_)) => {
-                    if let Err(e) = self.delete_rule(rule).await {
-                        error!("Failed to delete tc rule {}: {}", rule, e);
-                    }
-                }
-                Ok(None) => {}
-                Err(e) => {
-                    error!("Failed to get tc filter for rule {}: {}", rule, e);
-                }
-            }
-        }
-
         Ok(())
     }
 
