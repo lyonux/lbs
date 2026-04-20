@@ -1,3 +1,4 @@
+use crate::prelude::Global;
 use crate::prelude::Rule;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -10,11 +11,16 @@ pub enum ActionOption {
 #[derive(Debug)]
 pub struct Action {
     pub rules: Vec<Rule>,
+    pub global: Global,
     pub option: ActionOption,
 }
 
 impl Action {
-    pub fn new(rules: Vec<Rule>, option: ActionOption) -> Self {
-        Self { rules, option }
+    pub fn new(rules: Vec<Rule>, global: Global, option: ActionOption) -> Self {
+        Self {
+            rules,
+            global,
+            option,
+        }
     }
 }
