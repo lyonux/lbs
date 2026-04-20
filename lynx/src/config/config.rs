@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use lbs_core::prelude::Global;
 use lbs_core::prelude::Protocol;
 use lbs_core::prelude::Rule;
 use lbs_core::prelude::Target;
@@ -55,14 +56,47 @@ impl<'de> Deserialize<'de> for PortMapping {
 /// Protocol-specific rules
 pub type ProtocolRules = HashMap<String, PortMapping>;
 
-/// Main configuration structure
+/// Global configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlobalConfig {
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
+
+    #[serde(default)]
+    pub shutdown_cleanup: bool,
+}
+
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
+impl Default for GlobalConfig {
+    fn default() -> Self {
+        Self {
+            log_level: default_log_level(),
+            shutdown_cleanup: false,
+        }
+    }
+}
+
+/// Entry configuration containing forwarding rules
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Config {
+pub struct EntryConfig {
     #[serde(default)]
     pub tcp: ProtocolRules,
 
     #[serde(default)]
     pub udp: ProtocolRules,
+}
+
+/// Main configuration structure
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Config {
+    #[serde(default)]
+    pub global: GlobalConfig,
+
+    #[serde(default)]
+    pub entry: EntryConfig,
 }
 
 impl Config {
@@ -78,11 +112,22 @@ impl Config {
         Ok(config)
     }
 
+    /// Load only global configuration from a TOML file (synchronous, for early init)
+    pub fn load_global<P: AsRef<Path>>(path: P) -> Result<GlobalConfig> {
+        let content = std::fs::read_to_string(path.as_ref())
+            .with_context(|| format!("Failed to read config file: {}", path.as_ref().display()))?;
+
+        let config: Config = toml::from_str(&content)
+            .with_context(|| format!("Failed to parse config file: {}", path.as_ref().display()))?;
+
+        Ok(config.global)
+    }
+
     /// Get all unique rules as a flattened list for comparison
     pub fn get_all_rules(&self) -> Vec<Rule> {
         let mut rules = Vec::new();
 
-        for (vip, port_map) in &self.tcp {
+        for (vip, port_map) in &self.entry.tcp {
             for (port, targets) in port_map.iter() {
                 for target in targets {
                     rules.push(Rule {
@@ -95,7 +140,7 @@ impl Config {
             }
         }
 
-        for (vip, port_map) in &self.udp {
+        for (vip, port_map) in &self.entry.udp {
             for (port, targets) in port_map.iter() {
                 for target in targets {
                     rules.push(Rule {
@@ -111,9 +156,26 @@ impl Config {
         rules
     }
 
+    pub fn get_global(self) -> Global {
+        Global {
+            log_level: self.global.log_level,
+            shutdown_cleanup: self.global.shutdown_cleanup,
+        }
+    }
+
     /// Validate the configuration
     pub fn validate(&self) -> Result<()> {
-        for (vip, port_map) in &self.tcp {
+        // Validate log level
+        let valid_levels = ["trace", "debug", "info", "warn", "error"];
+        if !valid_levels.contains(&self.global.log_level.as_str()) {
+            anyhow::bail!(
+                "Invalid log level: {}. Must be one of: {}",
+                self.global.log_level,
+                valid_levels.join(", ")
+            );
+        }
+
+        for (vip, port_map) in &self.entry.tcp {
             self.validate_ip(vip)?;
             for (port, targets) in port_map.iter() {
                 if targets.is_empty() {
@@ -125,7 +187,7 @@ impl Config {
             }
         }
 
-        for (vip, port_map) in &self.udp {
+        for (vip, port_map) in &self.entry.udp {
             self.validate_ip(vip)?;
             for (port, targets) in port_map.iter() {
                 if targets.is_empty() {
@@ -154,16 +216,22 @@ mod tests {
     #[test]
     fn test_parse_config() {
         let toml = r#"
-            [tcp."172.16.111.111"]
+            [global]
+            log-level = "info"
+            shutdown-cleanup = false
+
+            [entry.tcp."172.16.111.111"]
             80 = ["192.168.111.111:80"]
 
-            [udp."172.16.111.111"]
+            [entry.udp."172.16.111.111"]
             80 = ["192.168.111.111:80"]
         "#;
 
         let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.tcp.len(), 1);
-        assert_eq!(config.udp.len(), 1);
+        assert_eq!(config.entry.tcp.len(), 1);
+        assert_eq!(config.entry.udp.len(), 1);
+        assert_eq!(config.global.log_level, "info");
+        assert!(!config.global.shutdown_cleanup);
     }
 
     #[test]

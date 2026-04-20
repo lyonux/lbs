@@ -9,6 +9,7 @@ use tokio::time::Duration;
 use tracing::{error, info};
 
 use crate::prelude::config::Config;
+use crate::prelude::config::GlobalConfig;
 use crate::prelude::watcher::ConfigWatcher;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -144,6 +145,8 @@ impl Manager {
 
         // Get rules from new configuration
         let new_rules = new_config.get_all_rules();
+        let new_global = new_config.clone().get_global();
+
         info!("New configuration has {} rules", new_rules.len());
 
         // Get current rules for comparison
@@ -153,7 +156,7 @@ impl Manager {
         }
 
         // Determine action based on rules comparison
-        let act = Action::new(new_rules, ActionOption::Reconcile);
+        let act = Action::new(new_rules, new_global, ActionOption::Reconcile);
 
         // Update current configuration
         if let Some(config) = &self.current_config {

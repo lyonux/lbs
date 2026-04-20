@@ -1,12 +1,14 @@
+[global]
+log-level = "info"
+shutdown-cleanup = true
+
 # TCP forwarding rules
-# Format: [tcp."<vip>"]
+# Format: [entry.tcp."<vip>"]
 #         <vip_port> = ["<target_ip>:<target_port>", ...]
 
-[tcp."172.16.192.111"]
+[entry.tcp."172.16.192.111"]
 # Forward TCP port 898 to a single target
 898 = ["192.168.2.94:898"]
-
-
 
 # Example: Forward to multiple targets (load balancing)
 # 8080 = [
@@ -16,10 +18,10 @@
 # ]
 
 # UDP forwarding rules
-# Format: [udp."<vip>"]
+# Format: [entry.udp."<vip>"]
 #         <vip_port> = ["<target_ip>:<target_port>", ...]
 
-[udp."172.16.192.111"]
+[entry.udp."172.16.192.111"]
 # Forward UDP port 898 to a single target
 898 = ["192.168.2.94:898"]
 891 = ["192.168.2.94:891"]

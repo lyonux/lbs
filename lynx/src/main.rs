@@ -1,9 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
+use lynx::config::config::Config;
 use lynx::config::maker::Manager;
 use lynx::prelude::reconcile::ReconcileManager;
 use std::path::PathBuf;
-use tracing::{Level, info};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// Lynx - Network rule processor using tokio ecosystem
@@ -22,11 +23,13 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Initialize tracing
+    // Load global config early for log level
+    let global = Config::load_global(&args.config).unwrap_or_default();
+
+    // Initialize tracing with configured log level
     tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
         .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&global.log_level)),
         )
         .init();
 
