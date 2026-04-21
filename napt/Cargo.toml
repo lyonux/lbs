@@ -1,5 +1,5 @@
 [package]
-name = "lynx"
+name = "napt"
 version = "0.1.0"
 edition = "2024"
 description = "Network rule processor using tokio ecosystem"
@@ -35,11 +35,11 @@ strip = true
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/lynx", dest = "/usr/local/bin/lynx", mode = "755" },
-    { source = "lynx/examples/config.toml", dest = "/var/lib/lynx/config.toml", config = "noreplace", mode = "644" },
-    { source = "lynx/systemd/lynx.service", dest = "/usr/lib/systemd/system/lynx.service", mode = "644" },
+    { source = "target/release/napt", dest = "/usr/local/bin/napt", mode = "755" },
+    { source = "napt/examples/config.toml", dest = "/var/lib/napt/config.toml", config = "noreplace", mode = "644" },
+    { source = "napt/systemd/napt.service", dest = "/usr/lib/systemd/system/napt.service", mode = "644" },
 ]
 post_install_script = """systemctl daemon-reload"""
-post_uninstall_script = """systemctl stop lynx || true
-systemctl disable lynx || true
+post_uninstall_script = """systemctl stop napt || true
+systemctl disable napt || true
 systemctl daemon-reload"""

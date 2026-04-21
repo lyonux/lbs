@@ -1,16 +1,16 @@
 use anyhow::Result;
 use clap::Parser;
-use lynx::config::config::Config;
-use lynx::config::maker::Manager;
-use lynx::prelude::reconcile::ReconcileManager;
+use napt::config::config::Config;
+use napt::config::maker::Manager;
+use napt::prelude::reconcile::ReconcileManager;
 use std::path::PathBuf;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-/// Lynx - Network rule processor using tokio ecosystem
+/// Napt - Network rule processor using tokio ecosystem
 #[derive(Parser, Debug)]
-#[command(name = "lynx")]
-#[command(author = "lynx contributors")]
+#[command(name = "napt")]
+#[command(author = "napt contributors")]
 #[command(version = "0.1.0")]
 #[command(about = "Network rule processor using tokio ecosystem", long_about = None)]
 struct Args {
@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    info!("Starting Lynx network rule processor");
+    info!("Starting Napt network rule processor");
     info!("Loading configuration from: {}", args.config.display());
 
     let (mut manager, maker) = Manager::new(args.config);

@@ -1,13 +1,13 @@
 [Unit]
-Description=Lynx Network Rule Processor
-Documentation=https://github.com/lynx/lynx
+Description=Napt Network Rule Processor
+Documentation=https://github.com/napt/napt
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=root
 Type=simple
-ExecStart=/usr/local/bin/lynx -c /var/lib/lynx/config.toml
+ExecStart=/usr/local/bin/napt -c /var/lib/napt/config.toml
 Restart=on-failure
 RestartSec=5s
 TimeoutStartSec=30s
@@ -18,7 +18,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/lynx /var/run
+ReadWritePaths=/var/lib/napt /var/run
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 
@@ -29,7 +29,7 @@ LimitNPROC=102400
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=lynx
+SyslogIdentifier=Napt
 
 [Install]
 WantedBy=multi-user.target

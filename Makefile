@@ -1,4 +1,4 @@
-# Makefile for Lynx Network Rule Processor
+# Makefile
 
 # Variables
 CARGO := cargo
@@ -13,10 +13,10 @@ build:
 	@echo "Building..."
 	$(CARGO) build --release
 
-# Build npm package
-npm_build:
+# Build rpm package
+rpm_build:
 	@echo "Building npm..."
-	@cargo generate-rpm -p lynx
+	@cargo generate-rpm -p napt
 
 # Run tests
 .PHONY: test
@@ -58,7 +58,7 @@ clean:
 # Show help
 .PHONY: help
 help:
-	@echo "Lynx Network Rule Processor - Makefile targets:"
+	@echo "Napt Network Rule Processor - Makefile targets:"
 	@echo ""
 	@echo "  all          - Build the project (default)"
 	@echo "  build        - Build the release binary"
