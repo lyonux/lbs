@@ -6,9 +6,8 @@ Wants=network-online.target
 
 [Service]
 User=root
-Type=notify
-NotifyAccess=all
-ExecStart=/usr/sbin/lynx -c /var/lib/lynx/config.toml
+Type=simple
+ExecStart=/usr/local/bin/lynx -c /var/lib/lynx/config.toml
 Restart=on-failure
 RestartSec=5s
 TimeoutStartSec=30s
@@ -25,7 +24,7 @@ AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 
 # Resource limits
 LimitNOFILE=65536
-LimitNPROC=4096
+LimitNPROC=102400
 
 # Logging
 StandardOutput=journal

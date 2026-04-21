@@ -3,7 +3,9 @@ name = "lynx"
 version = "0.1.0"
 edition = "2024"
 description = "Network rule processor using tokio ecosystem"
-authors = ["lynx contributors"]
+authors = ["lyon"]
+repository = "https://github.com/lyonux/lbs"
+license = "MIT"
 
 [dependencies]
 tokio = { version = "1.42", features = ["full"] }
@@ -30,3 +32,14 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/lynx", dest = "/usr/local/bin/lynx", mode = "755" },
+    { source = "lynx/examples/config.toml", dest = "/var/lib/lynx/config.toml", config = "noreplace", mode = "644" },
+    { source = "lynx/systemd/lynx.service", dest = "/usr/lib/systemd/system/lynx.service", mode = "644" },
+]
+post_install_script = """systemctl daemon-reload"""
+post_uninstall_script = """systemctl stop lynx || true
+systemctl disable lynx || true
+systemctl daemon-reload"""
