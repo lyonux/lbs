@@ -58,6 +58,7 @@ pub type ProtocolRules = HashMap<String, PortMapping>;
 
 /// Global configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct GlobalConfig {
     #[serde(default = "default_log_level")]
     pub log_level: String,
@@ -217,8 +218,8 @@ mod tests {
     fn test_parse_config() {
         let toml = r#"
             [global]
-            log-level = "info"
-            shutdown-cleanup = false
+            log-level = "debug"
+            shutdown-cleanup = true
 
             [entry.tcp."172.16.111.111"]
             80 = ["192.168.111.111:80"]
@@ -230,6 +231,18 @@ mod tests {
         let config: Config = toml::from_str(toml).unwrap();
         assert_eq!(config.entry.tcp.len(), 1);
         assert_eq!(config.entry.udp.len(), 1);
+        assert_eq!(config.global.log_level, "debug");
+        assert!(config.global.shutdown_cleanup);
+    }
+
+    #[test]
+    fn test_parse_config_defaults() {
+        let toml = r#"
+            [entry.tcp."172.16.111.111"]
+            80 = ["192.168.111.111:80"]
+        "#;
+
+        let config: Config = toml::from_str(toml).unwrap();
         assert_eq!(config.global.log_level, "info");
         assert!(!config.global.shutdown_cleanup);
     }

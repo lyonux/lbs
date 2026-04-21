@@ -1,6 +1,6 @@
 [global]
 log-level = "info"
-shutdown-cleanup = true
+shutdown-cleanup = false
 
 # TCP forwarding rules
 # Format: [entry.tcp."<vip>"]
