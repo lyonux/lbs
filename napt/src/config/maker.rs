@@ -6,7 +6,7 @@ use std::result::Result::Ok;
 use tokio::signal;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::Duration;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::prelude::config::Config;
 use crate::prelude::config::GlobalConfig;
@@ -73,11 +73,12 @@ impl Manager {
 
         // Create shutdown watch channel (allows multiple receivers)
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
-        // Spawn a task to handle graceful shutdown (Ctrl+C)
+        // Spawn a task to handle graceful shutdown (SIGINT / SIGTERM)
         tokio::spawn(async move {
-            if signal::ctrl_c().await.is_ok() {
-                info!("Received shutdown signal (Ctrl+C)");
-                let _ = shutdown_tx.send(true);
+            let sig = wait_for_shutdown_signal().await;
+            info!("Received {sig}, initiating graceful shutdown...");
+            if shutdown_tx.send(true).is_err() {
+                warn!("Shutdown channel closed before signal was delivered");
             }
         });
 
@@ -121,6 +122,20 @@ impl Manager {
         }
 
         Ok(())
+    }
+}
+
+// Wait for shutdown signal
+async fn wait_for_shutdown_signal() -> &'static str {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    let mut sigterm = signal(SignalKind::terminate()).expect("register SIGTERM");
+    let mut sigquit = signal(SignalKind::quit()).expect("register SIGQUIT");
+
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => "SIGINT",
+        _ = sigterm.recv() => "SIGTERM",
+        _ = sigquit.recv() => "SIGQUIT",
     }
 }
 
