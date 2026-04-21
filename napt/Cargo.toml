@@ -3,9 +3,12 @@ name = "napt"
 version = "0.1.0"
 edition = "2024"
 description = "Network rule processor using tokio ecosystem"
-authors = ["lyon"]
+authors = ["lyon <leenus1024@gmail.com>"]
 repository = "https://github.com/lyonux/lbs"
 license = "MIT"
+homepage = "https://github.com/lyonux/lbs/blob/main/README.md"
+keywords = ["network"]
+categories = ["network-programming"]
 
 [dependencies]
 tokio = { version = "1.42", features = ["full"] }
