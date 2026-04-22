@@ -1,5 +1,7 @@
 [global]
+# log level (trace, debug, info, warn, error)
 log-level = "info"
+# shutdown cleanup (true, false)
 shutdown-cleanup = false
 
 # TCP forwarding rules
