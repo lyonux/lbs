@@ -373,7 +373,7 @@ impl TcManager {
 
         let mut generic = TcActionGeneric::default();
         // Use index 1 for all actions in the chain (same index = chained)
-        generic.index = 1;
+        generic.index = 0;
         generic.action = TcActionType::Pipe;
 
         let mut nat_parms = TcNat::default();
@@ -411,7 +411,7 @@ impl TcManager {
         let mut parms = vec![0u8; 24];
 
         // tc_gen portion (20 bytes)
-        parms[0..4].copy_from_slice(&1u32.to_ne_bytes()); // index (same for all actions in chain)
+        parms[0..4].copy_from_slice(&0u32.to_ne_bytes()); // index 0 = kernel auto-assign
         parms[4..8].copy_from_slice(&0u32.to_ne_bytes()); // capab
         parms[8..12].copy_from_slice(&TC_ACT_PIPE.to_ne_bytes()); // action
         parms[12..16].copy_from_slice(&0i32.to_ne_bytes()); // refcnt
@@ -446,12 +446,12 @@ impl TcManager {
 
     /// Build pedit action for TCP/UDP source port modification
     /// Uses extended attributes (TCA_PEDIT_KEYS_EX) for proper header type display (tcp+0/udp+0)
-    fn build_pedit_sport_action(&self, port: u16, index: u32, htype: u32) -> TcAction {
+    fn build_pedit_sport_action(&self, port: u16, htype: u32) -> TcAction {
         // Build tc_pedit_sel header (24 bytes)
         let mut parms = vec![0u8; 24];
 
         // tc_gen portion
-        parms[0..4].copy_from_slice(&index.to_ne_bytes()); // action index in chain
+        parms[0..4].copy_from_slice(&0u32.to_ne_bytes()); // index 0 = kernel auto-assign
         parms[4..8].copy_from_slice(&0u32.to_ne_bytes()); // capab
         parms[8..12].copy_from_slice(&TC_ACT_PIPE.to_ne_bytes()); // action
         parms[12..16].copy_from_slice(&0i32.to_ne_bytes()); // refcnt
@@ -497,7 +497,7 @@ impl TcManager {
         let mut parms = vec![0u8; 24];
 
         // tc_gen portion (20 bytes)
-        parms[0..4].copy_from_slice(&1u32.to_ne_bytes()); // index (same for all actions in chain)
+        parms[0..4].copy_from_slice(&0u32.to_ne_bytes()); // index 0 = kernel auto-assign
         parms[4..8].copy_from_slice(&0u32.to_ne_bytes()); // capab
         parms[8..12].copy_from_slice(&TC_ACT_OK.to_ne_bytes()); // action (not PIPE)
         parms[12..16].copy_from_slice(&0i32.to_ne_bytes()); // refcnt
@@ -525,8 +525,8 @@ impl TcManager {
         // Build all actions
         let nat = self.build_nat_action(&rule.target.address, &rule.vip)?;
         let pedit_dscp = self.build_pedit_dscp_action();
-        let pedit_tcp_sport = self.build_pedit_sport_action(rule.vip_port, 2, PEDIT_HDR_TYPE_TCP);
-        let pedit_udp_sport = self.build_pedit_sport_action(rule.vip_port, 3, PEDIT_HDR_TYPE_UDP);
+        let pedit_tcp_sport = self.build_pedit_sport_action(rule.vip_port, PEDIT_HDR_TYPE_TCP);
+        let pedit_udp_sport = self.build_pedit_sport_action(rule.vip_port, PEDIT_HDR_TYPE_UDP);
         let csum = self.build_csum_action();
 
         // Add all actions to the chain
