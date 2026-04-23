@@ -3,20 +3,18 @@ use lbs_core::prelude::Action;
 use lbs_core::prelude::ActionOption;
 use lbs_core::prelude::Maker as MakerTrait;
 use std::result::Result::Ok;
-use tokio::signal;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
 use crate::prelude::config::Config;
-use crate::prelude::config::GlobalConfig;
 use crate::prelude::watcher::ConfigWatcher;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 const DEBOUNCE_DELAY: Duration = Duration::from_millis(32);
 
-/// Main rule manager that orchestrates iptables and tc rules
+/// Main rule manager that orchestrates iptables and traffic control rules
 pub struct Manager {
     config_path: PathBuf,
     current_config: Option<Arc<tokio::sync::RwLock<Config>>>,

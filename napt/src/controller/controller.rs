@@ -2,7 +2,7 @@ use anyhow::Result;
 use lbs_core::scheduler::controller::Controller;
 use lbs_core::scheduler::worker::{Maker, Worker};
 
-/// Main rule manager that orchestrates iptables and tc rules
+/// Main rule manager that orchestrates iptables and traffic control rules
 pub struct RuleManager<T: Worker, M: Maker> {
     controller: Controller<T, M>,
 }

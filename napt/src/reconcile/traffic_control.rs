@@ -163,7 +163,7 @@ impl U32MatchCriteria {
     }
 }
 
-/// Represents a collection of TC Message to be applied to a traffic control rule.
+/// Represents a collection of traffic controlMessage to be applied to a traffic control rule.
 pub struct TcMessages {
     messages: Vec<TcMessage>,
 }
@@ -547,7 +547,7 @@ impl TcManager {
         r
     }
 
-    /// Add tc filter rules using netlink
+    /// Add traffic controlfilter rules using netlink
     pub async fn add_rules(&mut self, to_add: &[Rule]) -> Result<()> {
         let all_list = self.list_filters().await?;
         let current_any = self
@@ -569,11 +569,14 @@ impl TcManager {
                 Ok(Some(_)) => {}
                 Ok(None) => {
                     if let Err(e) = self.add_rule(&rule).await {
-                        error!("Failed to add tc rule {}: {}", rule, e);
+                        error!("Failed to add traffic controlrule {}: {}", rule, e);
                     }
                 }
                 Err(e) => {
-                    error!("Failed to query tc filter for rule {}: {}", rule, e);
+                    error!(
+                        "Failed to query traffic controlfilter for rule {}: {}",
+                        rule, e
+                    );
                 }
             }
         }
@@ -581,7 +584,7 @@ impl TcManager {
         Ok(())
     }
 
-    /// Delete a tc filter rule using netlink
+    /// Delete a traffic controlfilter rule using netlink
     pub async fn delete_rules(&mut self, rules: &[Rule]) -> Result<()> {
         let all_list = self.list_filters().await?;
 
@@ -603,12 +606,15 @@ impl TcManager {
             match all_list.get_filter(rule) {
                 Ok(Some(_)) => {
                     if let Err(e) = self.delete_rule(rule).await {
-                        error!("Failed to delete tc rule {}: {}", rule, e);
+                        error!("Failed to delete traffic controlrule {}: {}", rule, e);
                     }
                 }
                 Ok(None) => {}
                 Err(e) => {
-                    error!("Failed to get tc filter for rule {}: {}", rule, e);
+                    error!(
+                        "Failed to get traffic controlfilter for rule {}: {}",
+                        rule, e
+                    );
                 }
             }
         }
@@ -616,9 +622,9 @@ impl TcManager {
         Ok(())
     }
 
-    /// Add a tc filter rule using netlink
+    /// Add a traffic controlfilter rule using netlink
     async fn add_rule(&mut self, rule: &Rule) -> Result<()> {
-        info!("Adding tc rule: {}", rule);
+        info!("Adding traffic controlrule: {}", rule);
 
         // Create match criteria from rule
         let criteria = U32MatchCriteria::from_rule(rule)?;
@@ -667,15 +673,15 @@ impl TcManager {
             .u32(&u32_options)?
             .execute()
             .await
-            .map_err(|e| anyhow!("Failed to add tc filter: {}", e))?;
+            .map_err(|e| anyhow!("Failed to add traffic controlfilter: {}", e))?;
 
-        debug!("Successfully added tc rule: {}", rule);
+        debug!("Successfully added traffic controlrule: {}", rule);
         Ok(())
     }
 
-    /// Delete a tc filter rule using netlink
+    /// Delete a traffic controlfilter rule using netlink
     async fn delete_rule(&mut self, rule: &Rule) -> Result<()> {
-        info!("Deleting tc rule: {}", rule);
+        info!("Deleting traffic controlrule: {}", rule);
         match self.list_filters().await?.get_filter(rule)? {
             Some(filter) => {
                 // Delete this specific filter by its handle
@@ -713,7 +719,7 @@ impl TcManager {
             None => return Ok(()),
         }
 
-        debug!("Successfully deleted tc rule: {}", rule);
+        debug!("Successfully deleted traffic controlrule: {}", rule);
         return Ok(());
     }
 
@@ -731,7 +737,7 @@ impl TcManager {
         let to_remove: Vec<_> = self.current_rules.difference(&new_rules).cloned().collect();
 
         info!(
-            "Applying tc rules: {} to add, {} to remove",
+            "Applying traffic controlrules: {} to add, {} to remove",
             to_add.len(),
             to_remove.len()
         );
@@ -742,9 +748,9 @@ impl TcManager {
         Ok(())
     }
 
-    /// Flush all tc filters from the qdisc using netlink
+    /// Flush all traffic controlfilters from the qdisc using netlink
     async fn flush_filters(&self) -> Result<()> {
-        debug!("Flushing tc filters on {}", self.interface.name);
+        debug!("Flushing traffic controlfilters on {}", self.interface.name);
 
         // Delete all filters with parent 1:
         match self
@@ -764,9 +770,9 @@ impl TcManager {
         Ok(())
     }
 
-    /// Initialize tc rules
+    /// Initialize traffic controlrules
     pub async fn initialize(&mut self) -> Result<()> {
-        info!("Initializing tc manager");
+        info!("Initializing traffic controlmanager");
 
         // Ensure qdisc is set up
         self.ensure_qdisc().await?;
@@ -779,12 +785,13 @@ impl TcManager {
 
     /// Cleanup all managed rules
     pub async fn cleanup(&mut self) -> Result<()> {
-        info!("Cleaning up tc rules");
+        info!("Cleaning up traffic controlrules");
 
         self.flush_filters().await?;
         self.current_rules.clear();
         self.qdisc_initialized = false;
 
+        info!("traffic controlrules cleaned up done");
         Ok(())
     }
 }

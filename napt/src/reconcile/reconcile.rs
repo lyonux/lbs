@@ -8,7 +8,7 @@ use crate::prelude::iptables::IptablesManager;
 use crate::prelude::network::detect_primary_interface;
 use crate::prelude::traffic_control::TcManager;
 
-/// Main rule manager that orchestrates iptables and tc rules
+/// Main rule manager that orchestrates iptables and traffic control rules
 pub struct ReconcileManager {
     iptables: IptablesManager,
     tc: TcManager,
@@ -46,8 +46,8 @@ impl ReconcileManager {
 
         // Apply rules to tc
         if let Err(e) = self.tc.apply_rules(rules).await {
-            warn!("Failed to apply tc rules: {}", e);
-            // Don't fail on tc errors, as they might be due to missing kernel modules
+            warn!("Failed to apply traffic control rules: {}", e);
+            // Don't fail on traffic control errors, as they might be due to missing kernel modules
         }
 
         info!("Configuration reloaded done");
@@ -67,7 +67,7 @@ impl ReconcileManager {
 
         // Add rules to tc
         if let Err(e) = self.tc.add_rules(rules).await {
-            warn!("Failed to add tc rules: {}", e);
+            warn!("Failed to add traffic control rules: {}", e);
         }
 
         info!("Configuration reloaded done");
@@ -81,7 +81,7 @@ impl ReconcileManager {
 
         // Delete rules from tc
         if let Err(e) = self.tc.delete_rules(rules).await {
-            warn!("Failed to delete tc rules: {}", e);
+            warn!("Failed to delete traffic control rules: {}", e);
         }
 
         info!("Configuration reloaded done");
@@ -97,7 +97,7 @@ impl ReconcileManager {
         }
 
         if let Err(e) = self.tc.cleanup().await {
-            warn!("Failed to cleanup tc rules: {}", e);
+            warn!("Failed to cleanup traffic control rules: {}", e);
         }
 
         Ok(())
@@ -134,7 +134,6 @@ impl Consumer<Action> for ReconcileManager {
                     warn!("Failed to remove: {}", e);
                 }
             }
-            _ => {}
         }
     }
     async fn stop(&mut self) {
